@@ -5,7 +5,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestDownload_ExistingFile(t *testing.T) {
@@ -120,5 +122,86 @@ func TestUpload_APIError(t *testing.T) {
 	err := client.Upload("/some/path.md", "content")
 	if err == nil {
 		t.Fatal("expected error for 500")
+	}
+}
+
+func TestIntegration_AppendToExistingFile(t *testing.T) {
+	existingContent := "### 10:00:00\nmorning note\n"
+	var uploadedContent string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "download"):
+			w.WriteHeader(200)
+			w.Write([]byte(existingContent))
+		case strings.Contains(r.URL.Path, "upload"):
+			body, _ := io.ReadAll(r.Body)
+			uploadedContent = string(body)
+			w.WriteHeader(200)
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer server.Close()
+
+	client := &DropboxClient{Token: "test-token", BaseURL: server.URL}
+	now := time.Date(2025, 1, 15, 14, 30, 45, 0, time.UTC)
+	path := resolvePath(now)
+
+	existing, err := client.Download(path)
+	if err != nil {
+		t.Fatalf("download: %v", err)
+	}
+
+	entry := formatEntry(now, "afternoon note")
+	newContent := appendContent(existing, entry)
+
+	err = client.Upload(path, newContent)
+	if err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+
+	expected := "### 10:00:00\nmorning note\n\n### 14:30:45\nafternoon note\n"
+	if uploadedContent != expected {
+		t.Errorf("expected %q, got %q", expected, uploadedContent)
+	}
+}
+
+func TestIntegration_NewFile(t *testing.T) {
+	var uploadedContent string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "download"):
+			w.WriteHeader(409)
+			w.Write([]byte(`{"error_summary": "path/not_found/"}`))
+		case strings.Contains(r.URL.Path, "upload"):
+			body, _ := io.ReadAll(r.Body)
+			uploadedContent = string(body)
+			w.WriteHeader(200)
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer server.Close()
+
+	client := &DropboxClient{Token: "test-token", BaseURL: server.URL}
+	now := time.Date(2025, 1, 15, 9, 0, 0, 0, time.UTC)
+	path := resolvePath(now)
+
+	existing, err := client.Download(path)
+	if err != nil {
+		t.Fatalf("download: %v", err)
+	}
+
+	entry := formatEntry(now, "first note of the day")
+	newContent := appendContent(existing, entry)
+
+	err = client.Upload(path, newContent)
+	if err != nil {
+		t.Fatalf("upload: %v", err)
+	}
+
+	expected := "### 09:00:00\nfirst note of the day\n"
+	if uploadedContent != expected {
+		t.Errorf("expected %q, got %q", expected, uploadedContent)
 	}
 }
