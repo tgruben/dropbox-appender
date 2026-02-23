@@ -1,8 +1,8 @@
 # dropbox-appender
 
-Append timestamped entries to a daily journal file in Dropbox.
+A minimal Go CLI that appends timestamped entries to a daily journal file in Dropbox.
 
-Entries go to `/Journal/YYYY/MM/NoteYYYYMMDD.md` with a `### HH:MM:SS` header.
+Entries go to `/Notes/Journal/YYYY/MM/NoteYYYYMMDD.md` with a `### HH:MM:SS` header.
 
 ## Setup
 
@@ -15,6 +15,20 @@ Entries go to `/Journal/YYYY/MM/NoteYYYYMMDD.md` with a `### HH:MM:SS` header.
 export DROPBOX_TOKEN="your-token-here"
 ```
 
+## Install
+
+```bash
+go install github.com/tgruben/dropbox-appender@latest
+```
+
+Or build from source:
+
+```bash
+git clone https://github.com/tgruben/dropbox-appender.git
+cd dropbox-appender
+go build -o dropbox-appender .
+```
+
 ## Usage
 
 ```bash
@@ -23,17 +37,14 @@ dropbox-appender "Had a great meeting"
 
 # Pipe from stdin
 echo "Some note" | dropbox-appender
-```
 
-## Build
-
-```bash
-go build -o dropbox-appender .
+# Without timestamp header
+dropbox-appender -no-timestamp "Just the text"
 ```
 
 ## Example Output
 
-After two entries, `/Journal/2025/01/Note20250115.md` contains:
+After two entries, `/Notes/Journal/2025/01/Note20250115.md` contains:
 
 ```markdown
 ### 10:00:00
@@ -42,3 +53,7 @@ morning standup went well
 ### 14:30:45
 Had a great meeting
 ```
+
+## License
+
+[MIT](LICENSE)
