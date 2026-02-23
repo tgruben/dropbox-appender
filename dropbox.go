@@ -62,3 +62,33 @@ func (c *DropboxClient) Download(path string) (string, error) {
 
 	return string(body), nil
 }
+
+// Upload writes content to a file in Dropbox, overwriting if it exists.
+func (c *DropboxClient) Upload(path string, content string) error {
+	arg, _ := json.Marshal(map[string]interface{}{
+		"path": path,
+		"mode": "overwrite",
+		"mute": true,
+	})
+
+	req, err := http.NewRequest("POST", c.baseURL()+"/2/files/upload", strings.NewReader(content))
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Dropbox-API-Arg", string(arg))
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("upload request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("dropbox API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
