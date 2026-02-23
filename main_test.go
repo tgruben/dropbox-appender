@@ -8,7 +8,7 @@ import (
 func TestResolvePath(t *testing.T) {
 	now := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
 	path := resolvePath(now)
-	expected := "/Journal/2025/01/Note20250115.md"
+	expected := "/Notes/Journal/2025/01/Note20250115.md"
 	if path != expected {
 		t.Errorf("expected %q, got %q", expected, path)
 	}
@@ -17,7 +17,7 @@ func TestResolvePath(t *testing.T) {
 func TestResolvePath_December(t *testing.T) {
 	now := time.Date(2025, 12, 3, 9, 0, 0, 0, time.UTC)
 	path := resolvePath(now)
-	expected := "/Journal/2025/12/Note20251203.md"
+	expected := "/Notes/Journal/2025/12/Note20251203.md"
 	if path != expected {
 		t.Errorf("expected %q, got %q", expected, path)
 	}

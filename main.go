@@ -10,7 +10,7 @@ import (
 
 // resolvePath returns the Dropbox path for today's journal file.
 func resolvePath(now time.Time) string {
-	return fmt.Sprintf("/Journal/%s/%s/Note%s.md",
+	return fmt.Sprintf("/Notes/Journal/%s/%s/Note%s.md",
 		now.Format("2006"),
 		now.Format("01"),
 		now.Format("20060102"),
