@@ -25,8 +25,17 @@ func TestResolvePath_December(t *testing.T) {
 
 func TestFormatEntry(t *testing.T) {
 	now := time.Date(2025, 1, 15, 14, 30, 45, 0, time.UTC)
-	entry := formatEntry(now, "Had a great meeting")
+	entry := formatEntry(now, "Had a great meeting", false)
 	expected := "### 14:30:45\nHad a great meeting\n"
+	if entry != expected {
+		t.Errorf("expected %q, got %q", expected, entry)
+	}
+}
+
+func TestFormatEntry_NoTimestamp(t *testing.T) {
+	now := time.Date(2025, 1, 15, 14, 30, 45, 0, time.UTC)
+	entry := formatEntry(now, "Had a great meeting", true)
+	expected := "Had a great meeting\n"
 	if entry != expected {
 		t.Errorf("expected %q, got %q", expected, entry)
 	}

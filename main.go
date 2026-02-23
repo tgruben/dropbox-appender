@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -17,15 +18,18 @@ func resolvePath(now time.Time) string {
 	)
 }
 
-// formatEntry prepends a timestamp header to the input text.
-func formatEntry(now time.Time, text string) string {
+// formatEntry formats the input text, optionally with a timestamp header.
+func formatEntry(now time.Time, text string, noTimestamp bool) string {
+	if noTimestamp {
+		return text + "\n"
+	}
 	return fmt.Sprintf("### %s\n%s\n", now.Format("15:04:05"), text)
 }
 
-// readInput reads from CLI args first, then stdin.
+// readInput reads from remaining CLI args first, then stdin.
 func readInput(args []string) (string, error) {
-	if len(args) > 1 {
-		return strings.Join(args[1:], " "), nil
+	if len(args) > 0 {
+		return strings.Join(args, " "), nil
 	}
 
 	// Check if stdin has data (is not a terminal)
@@ -53,13 +57,16 @@ func appendContent(existing string, entry string) string {
 }
 
 func main() {
+	noTimestamp := flag.Bool("no-timestamp", false, "omit the ### HH:MM:SS header")
+	flag.Parse()
+
 	token := os.Getenv("DROPBOX_TOKEN")
 	if token == "" {
 		fmt.Fprintln(os.Stderr, "DROPBOX_TOKEN environment variable is required")
 		os.Exit(1)
 	}
 
-	input, err := readInput(os.Args)
+	input, err := readInput(flag.Args())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -67,7 +74,7 @@ func main() {
 
 	now := time.Now()
 	path := resolvePath(now)
-	entry := formatEntry(now, input)
+	entry := formatEntry(now, input, *noTimestamp)
 
 	client := &DropboxClient{Token: token}
 

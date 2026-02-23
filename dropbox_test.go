@@ -152,7 +152,7 @@ func TestIntegration_AppendToExistingFile(t *testing.T) {
 		t.Fatalf("download: %v", err)
 	}
 
-	entry := formatEntry(now, "afternoon note")
+	entry := formatEntry(now, "afternoon note", false)
 	newContent := appendContent(existing, entry)
 
 	err = client.Upload(path, newContent)
@@ -192,7 +192,7 @@ func TestIntegration_NewFile(t *testing.T) {
 		t.Fatalf("download: %v", err)
 	}
 
-	entry := formatEntry(now, "first note of the day")
+	entry := formatEntry(now, "first note of the day", false)
 	newContent := appendContent(existing, entry)
 
 	err = client.Upload(path, newContent)
