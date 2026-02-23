@@ -1,0 +1,20 @@
+#!/bin/bash
+# Git post-commit hook that appends commit info to daily journal via dropbox-appender
+
+# Get repo and project info
+repo=$(git config --local remote.origin.url | sed 's/[^:]*:\([^\/]*\).*/\1/')
+project=$(git config --local remote.origin.url | sed -n 's#.*/\([^.]*\)\.git#\1#p')
+
+[[ "$project" == "Notes" ]] && exit 0
+[[ "$project" == "" ]] && exit 0
+
+commit=$(git --no-pager log -n1 --date=format:"%H:%M:%S" --format=format:"### %cd%n:commit: %h %s%n%b")
+fhash=$(git rev-parse HEAD)
+
+link="https://github.com/$repo/$project/commit/$fhash"
+
+# Build the entry (same format as the original script)
+entry="${commit}\n #${project}\n\n[github](${link})"
+
+# Use dropbox-appender with no-timestamp (the commit already has ### HH:MM:SS)
+echo -e "$entry" | dropbox-appender -no-timestamp
