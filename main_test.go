@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -56,5 +57,41 @@ func TestAppendContent_Existing(t *testing.T) {
 	expected := "### 10:00:00\nmorning note\n\n### 14:30:45\nafternoon note\n"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestResolveToken_EnvVar(t *testing.T) {
+	t.Setenv("DROPBOX_TOKEN", "direct_token")
+	cfg := &Config{}
+	token, err := resolveToken(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if token != "direct_token" {
+		t.Errorf("expected direct_token, got %s", token)
+	}
+}
+
+func TestResolveToken_EnvVarTakesPriority(t *testing.T) {
+	t.Setenv("DROPBOX_TOKEN", "direct_token")
+	cfg := &Config{AppKey: "k", AppSecret: "s", RefreshToken: "r"}
+	token, err := resolveToken(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if token != "direct_token" {
+		t.Errorf("expected direct_token, got %s", token)
+	}
+}
+
+func TestResolveToken_NoAuth(t *testing.T) {
+	t.Setenv("DROPBOX_TOKEN", "")
+	cfg := &Config{}
+	_, err := resolveToken(cfg)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "dropbox-appender auth") {
+		t.Errorf("expected guidance to run auth, got: %v", err)
 	}
 }
