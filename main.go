@@ -141,6 +141,8 @@ func main() {
 			return
 		case "sketch":
 			os.Exit(runSketch(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
+		case "image":
+			os.Exit(runImage(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 		}
 	}
 

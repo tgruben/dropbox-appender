@@ -55,6 +55,12 @@ echo "Some note" | dropbox-appender
 
 # Without timestamp header
 dropbox-appender -no-timestamp "Just the text"
+
+# Save a sketch from an .excalidraw JSON file on stdin
+cat drawing.excalidraw | dropbox-appender sketch
+
+# Paste the current clipboard image into /Notes/attachments and link it
+dropbox-appender image
 ```
 
 ## Authentication Priority
@@ -74,6 +80,25 @@ morning standup went well
 ### 14:30:45
 Had a great meeting
 ```
+
+### `image` subcommand
+
+`dropbox-appender image` reads an image from the Wayland clipboard via
+`wl-paste`, uploads it to `/Notes/attachments/image-YYYYMMDD-HHMMSS.png`, and
+appends a markdown image link to today's journal. Useful for pasting
+screenshots directly into your notes.
+
+```markdown
+### 14:30:45
+![image-20250115-143045](../../../attachments/image-20250115-143045.png)
+```
+
+Flags:
+
+- `-name` — filename without extension (default: `image-YYYYMMDD-HHMMSS`)
+- `-folder` — Dropbox folder for attachments (default: `/Notes/attachments`)
+- `-type` — clipboard MIME type (default: `image/png`; also supports
+  `image/jpeg`, `image/gif`, `image/webp`, `image/bmp`)
 
 ## License
 

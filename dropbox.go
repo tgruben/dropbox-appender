@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -65,13 +66,20 @@ func (c *DropboxClient) Download(path string) (string, error) {
 
 // Upload writes content to a file in Dropbox, overwriting if it exists.
 func (c *DropboxClient) Upload(path string, content string) error {
+	return c.UploadBytes(path, []byte(content))
+}
+
+// UploadBytes writes raw bytes to a file in Dropbox, overwriting if it exists.
+// Use this instead of Upload for binary content (e.g. images) so the payload
+// is not corrupted by string handling.
+func (c *DropboxClient) UploadBytes(path string, data []byte) error {
 	arg, _ := json.Marshal(map[string]interface{}{
 		"path": path,
 		"mode": "overwrite",
 		"mute": true,
 	})
 
-	req, err := http.NewRequest("POST", c.baseURL()+"/2/files/upload", strings.NewReader(content))
+	req, err := http.NewRequest("POST", c.baseURL()+"/2/files/upload", bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
