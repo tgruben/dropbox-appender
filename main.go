@@ -118,11 +118,30 @@ func runAuth(configPath string) {
 	fmt.Println("\nAuthentication successful! Refresh token saved.")
 }
 
+// appendToJournal downloads an existing journal file (if any), appends the
+// entry, and re-uploads it. Shared by the default text mode and the sketch
+// subcommand.
+func appendToJournal(client *DropboxClient, path, entry string) error {
+	existing, err := client.Download(path)
+	if err != nil {
+		return fmt.Errorf("downloading journal: %w", err)
+	}
+	if err := client.Upload(path, appendContent(existing, entry)); err != nil {
+		return fmt.Errorf("uploading journal: %w", err)
+	}
+	return nil
+}
+
 func main() {
-	// Check for auth subcommand before flag parsing
-	if len(os.Args) > 1 && os.Args[1] == "auth" {
-		runAuth(defaultConfigPath())
-		return
+	// Check for subcommands before flag parsing.
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "auth":
+			runAuth(defaultConfigPath())
+			return
+		case "sketch":
+			os.Exit(runSketch(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
+		}
 	}
 
 	noTimestamp := flag.Bool("no-timestamp", false, "omit the ### HH:MM:SS header")
@@ -152,17 +171,8 @@ func main() {
 	entry := formatEntry(now, input, *noTimestamp)
 
 	client := &DropboxClient{Token: token}
-
-	existing, err := client.Download(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error downloading: %v\n", err)
-		os.Exit(1)
-	}
-
-	newContent := appendContent(existing, entry)
-
-	if err := client.Upload(path, newContent); err != nil {
-		fmt.Fprintf(os.Stderr, "error uploading: %v\n", err)
+	if err := appendToJournal(client, path, entry); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 

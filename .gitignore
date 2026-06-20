@@ -1,0 +1,4 @@
+# Go build artifacts
+/dropbox-appender
+*.test
+*.out
