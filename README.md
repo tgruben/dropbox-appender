@@ -62,16 +62,23 @@ cat drawing.excalidraw | dropbox-appender sketch
 # Paste the current clipboard image into /Notes/attachments and link it
 dropbox-appender image
 
-# Append to a specific file instead of today's journal
-dropbox-appender -file /Notes/Projects/alpha "Long-form note body"
+# Append stdin to a specific file and link it from today's journal
+cat notes.md | dropbox-appender file /Notes/Projects/alpha
+
+# Show every flag for the default mode and all subcommands
+dropbox-appender -h
+
+# Print the installed version (the release tag, e.g. v0.3.0)
+dropbox-appender -version
 ```
 
-With `-file`, the entry is appended to that file (created if missing, `.md` suffix
-added if omitted), and today's journal gets a timestamped entry linking to it:
+With `file`, the stdin content is appended to that file (created if missing, `.md`
+suffix added if omitted), and today's journal gets a timestamped entry linking to it
+(`file -no-timestamp` omits the `### HH:MM:SS` header from both):
 
 ```markdown
 ### 14:30:45
-[alpha](https://www.dropbox.com%2FNotes%2FProjects%2Falpha.md?dl=0)
+[[Projects/alpha]]
 ```
 
 ## Authentication Priority

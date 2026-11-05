@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -33,11 +34,42 @@ func sketchMarkdownLink(name string) string {
 	return fmt.Sprintf("[%s](../../../attachments/Excalidraw/%s.excalidraw)", name, name)
 }
 
+// sketchOptions holds the flags accepted by the sketch subcommand.
+type sketchOptions struct {
+	name   string
+	folder string
+}
+
+// newSketchFlagSet defines the sketch subcommand's flags, binding them to opts.
+// It is also used to render the sketch section of the top-level help.
+func newSketchFlagSet(opts *sketchOptions) *flag.FlagSet {
+	fs := flag.NewFlagSet("sketch", flag.ContinueOnError)
+	fs.StringVar(&opts.name, "name", "", "filename (without extension) for the sketch; defaults to sketch-YYYYMMDD-HHMMSS")
+	fs.StringVar(&opts.folder, "folder", defaultSketchFolder, "Dropbox folder for sketch attachments")
+	fs.Usage = func() {
+		fmt.Fprint(fs.Output(), "Usage: dropbox-appender sketch [flags] < drawing.excalidraw\n\n"+
+			"Upload an .excalidraw JSON document read from stdin and link it from\n"+
+			"today's journal entry.\n\nFlags:\n")
+		fs.PrintDefaults()
+	}
+	return fs
+}
+
 // runSketch implements the `dropbox-appender sketch` subcommand: it reads an
 // .excalidraw JSON document from stdin, uploads it to the attachments folder,
 // and appends a markdown link to today's journal entry. It returns the process
 // exit code.
 func runSketch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	var opts sketchOptions
+	fs := newSketchFlagSet(&opts)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+
 	data, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "error reading stdin: %v\n", err)
@@ -46,14 +78,6 @@ func runSketch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(strings.TrimSpace(string(data))) == 0 {
 		fmt.Fprintln(stderr, "no sketch data provided on stdin")
 		return 1
-	}
-
-	fs := flag.NewFlagSet("sketch", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	name := fs.String("name", "", "filename (without extension) for the sketch; defaults to sketch-YYYYMMDD-HHMMSS")
-	folder := fs.String("folder", defaultSketchFolder, "Dropbox folder for sketch attachments")
-	if err := fs.Parse(args); err != nil {
-		return 2
 	}
 
 	cfg, err := loadConfig(defaultConfigPath())
@@ -68,7 +92,7 @@ func runSketch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	return runSketchWithClient(args, stdin, stdout, stderr,
-		&DropboxClient{Token: token}, time.Now(), string(data), *name, *folder)
+		&DropboxClient{Token: token}, time.Now(), string(data), opts.name, opts.folder)
 }
 
 // runSketchWithClient is the testable core of the sketch subcommand. It uploads

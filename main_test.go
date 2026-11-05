@@ -62,7 +62,7 @@ func TestAppendContent_Existing(t *testing.T) {
 
 func TestNormalizePath(t *testing.T) {
 	cases := []struct {
-	in, want string
+		in, want string
 	}{
 		{"/Notes/Projects/alpha", "/Notes/Projects/alpha.md"},
 		{"Notes/Projects/alpha", "/Notes/Projects/alpha.md"},
@@ -79,7 +79,7 @@ func TestNormalizePath(t *testing.T) {
 
 func TestFileLink(t *testing.T) {
 	got := fileLink("/Notes/Projects/alpha.md")
-	want := "[alpha](https://www.dropbox.com%2FNotes%2FProjects%2Falpha.md?dl=0)"
+	want := "[[Projects/alpha]]"
 	if got != want {
 		t.Errorf("fileLink = %q, want %q", got, want)
 	}

@@ -2,12 +2,12 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
-	"path"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -56,35 +56,6 @@ func appendContent(existing string, entry string) string {
 		return entry
 	}
 	return existing + "\n" + entry
-}
-
-// normalizePath ensures the Dropbox path is absolute and ends in .md.
-func normalizePath(path string) string {
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	if !strings.HasSuffix(path, ".md") {
-		path += ".md"
-	}
-	return path
-}
-
-// fileLink returns a markdown link to a Dropbox file path.
-func fileLink(p string) string {
-	return fmt.Sprintf("[%s](https://www.dropbox.com%s?dl=0)",
-		strings.TrimSuffix(path.Base(p), ".md"),
-		url.PathEscape(p))
-}
-
-// appendWithLink appends entry to file at path (creating it), then appends
-// a timestamped link entry to today's journal pointing at that file.
-func appendWithLink(client *DropboxClient, now time.Time, path string, entry string, noTimestamp bool) error {
-	if err := appendToJournal(client, path, entry); err != nil {
-		return err
-	}
-
-	linkEntry := formatEntry(now, fileLink(path), noTimestamp)
-	return appendToJournal(client, resolvePath(now), linkEntry)
 }
 
 // resolveToken gets an access token using the priority chain:
@@ -163,23 +134,103 @@ func appendToJournal(client *DropboxClient, path, entry string) error {
 	return nil
 }
 
+// buildVersion reports the module version stamped into the binary by the Go
+// toolchain: the release tag for `go install ...@vX.Y.Z` or a `go build` from a
+// tagged checkout, or a pseudo-version for untagged/dirty builds.
+func buildVersion() string {
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" {
+		return bi.Main.Version
+	}
+	return "(devel)"
+}
+
+// rootOptions holds the flags accepted by the default journal-append mode.
+type rootOptions struct {
+	noTimestamp bool
+	version     bool
+}
+
+// newRootFlagSet defines the top-level flags, binding them to opts. Its Usage
+// prints the full help, including every subcommand and its flags.
+func newRootFlagSet(opts *rootOptions) *flag.FlagSet {
+	fs := flag.NewFlagSet("dropbox-appender", flag.ExitOnError)
+	fs.BoolVar(&opts.noTimestamp, "no-timestamp", false, "omit the ### HH:MM:SS header")
+	fs.BoolVar(&opts.version, "version", false, "print the version and exit")
+	fs.Usage = func() { printUsage(fs.Output(), fs) }
+	return fs
+}
+
+// newAuthFlagSet defines the auth subcommand, which takes no flags; it exists
+// so `auth -h` prints help instead of starting the authorization flow.
+func newAuthFlagSet() *flag.FlagSet {
+	fs := flag.NewFlagSet("auth", flag.ContinueOnError)
+	fs.Usage = func() {
+		fmt.Fprint(fs.Output(), "Usage: dropbox-appender auth\n\n"+
+			"Authorize with Dropbox interactively and save the refresh token to\n"+
+			"  "+defaultConfigPath()+"\n"+
+			"Requires app_key and app_secret in that file or the DROPBOX_APP_KEY\n"+
+			"and DROPBOX_APP_SECRET env vars.\n")
+	}
+	return fs
+}
+
+// printUsage writes the top-level help: default-mode usage and flags followed
+// by each subcommand's usage and flags.
+func printUsage(w io.Writer, root *flag.FlagSet) {
+	fmt.Fprint(w, "Usage: dropbox-appender [flags] [text...]\n"+
+		"       dropbox-appender <command> [flags]\n\n"+
+		"Append a timestamped entry to today's Dropbox journal\n"+
+		"(/Notes/Journal/YYYY/MM/NoteYYYYMMDD.md). Text comes from the arguments,\n"+
+		"or from stdin when no arguments are given.\n\n"+
+		"Flags:\n")
+	root.PrintDefaults()
+	fmt.Fprint(w, "\nCommands:\n"+
+		"  auth     authorize with Dropbox and save a refresh token\n"+
+		"  sketch   upload an .excalidraw sketch from stdin and link it in today's journal\n"+
+		"  image    upload the clipboard image and link it in today's journal\n"+
+		"  file     append stdin to a Dropbox file and link it in today's journal\n")
+	for _, fs := range []*flag.FlagSet{newAuthFlagSet(), newSketchFlagSet(&sketchOptions{}), newImageFlagSet(&imageOptions{}), newFileFlagSet(&fileOptions{})} {
+		fmt.Fprintln(w)
+		fs.SetOutput(w)
+		fs.Usage()
+	}
+	fmt.Fprint(w, "\nEnvironment:\n"+
+		"  DROPBOX_TOKEN          access token used directly, bypassing refresh\n"+
+		"  DROPBOX_REFRESH_TOKEN  refresh token (overrides the config file)\n"+
+		"  DROPBOX_APP_KEY        app key (overrides the config file)\n"+
+		"  DROPBOX_APP_SECRET     app secret (overrides the config file)\n")
+}
+
 func main() {
 	// Check for subcommands before flag parsing.
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "auth":
+			fs := newAuthFlagSet()
+			if err := fs.Parse(os.Args[2:]); err != nil {
+				if errors.Is(err, flag.ErrHelp) {
+					os.Exit(0)
+				}
+				os.Exit(2)
+			}
 			runAuth(defaultConfigPath())
 			return
 		case "sketch":
 			os.Exit(runSketch(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 		case "image":
 			os.Exit(runImage(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
+		case "file":
+			os.Exit(runFile(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 		}
 	}
 
-	noTimestamp := flag.Bool("no-timestamp", false, "omit the ### HH:MM:SS header")
-	filePath := flag.String("file", "", "append to the Dropbox file at this path (created if missing) and link to it from today's journal entry")
-	flag.Parse()
+	var opts rootOptions
+	fs := newRootFlagSet(&opts)
+	fs.Parse(os.Args[1:]) // ExitOnError: exits on -h or bad flags.
+	if opts.version {
+		fmt.Println(buildVersion())
+		return
+	}
 
 	configPath := defaultConfigPath()
 	cfg, err := loadConfig(configPath)
@@ -194,7 +245,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	input, err := readInput(flag.Args())
+	input, err := readInput(fs.Args())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -202,18 +253,8 @@ func main() {
 
 	now := time.Now()
 	client := &DropboxClient{Token: token}
-	if *filePath != "" {
-		target := normalizePath(*filePath)
-		if err := appendWithLink(client, now, target, formatEntry(now, input, *noTimestamp), *noTimestamp); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("Appended to %s\n", target)
-		return
-	}
-
 	path := resolvePath(now)
-	entry := formatEntry(now, input, *noTimestamp)
+	entry := formatEntry(now, input, opts.noTimestamp)
 	if err := appendToJournal(client, path, entry); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -68,21 +69,45 @@ func (wlPasteReader) ReadImage(mime string) ([]byte, error) {
 	return out, nil
 }
 
+// imageOptions holds the flags accepted by the image subcommand.
+type imageOptions struct {
+	name   string
+	folder string
+	mime   string
+}
+
+// newImageFlagSet defines the image subcommand's flags, binding them to opts.
+// It is also used to render the image section of the top-level help.
+func newImageFlagSet(opts *imageOptions) *flag.FlagSet {
+	fs := flag.NewFlagSet("image", flag.ContinueOnError)
+	fs.StringVar(&opts.name, "name", "", "filename (without extension) for the image; defaults to image-YYYYMMDD-HHMMSS")
+	fs.StringVar(&opts.folder, "folder", defaultImageFolder, "Dropbox folder for image attachments")
+	fs.StringVar(&opts.mime, "type", defaultImageMIME, "clipboard image MIME type to paste: image/png, image/jpeg, image/gif, image/webp, or image/bmp")
+	fs.Usage = func() {
+		fmt.Fprint(fs.Output(), "Usage: dropbox-appender image [flags]\n\n"+
+			"Upload the current Wayland clipboard image (via wl-paste) and link it\n"+
+			"from today's journal entry.\n\nFlags:\n")
+		fs.PrintDefaults()
+	}
+	return fs
+}
+
 // runImage implements the `dropbox-appender image` subcommand: it reads an
 // image from the Wayland clipboard, uploads it to the attachments folder, and
 // appends a markdown image link to today's journal entry. It returns the
 // process exit code.
 func runImage(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("image", flag.ContinueOnError)
+	var opts imageOptions
+	fs := newImageFlagSet(&opts)
 	fs.SetOutput(stderr)
-	name := fs.String("name", "", "filename (without extension) for the image; defaults to image-YYYYMMDD-HHMMSS")
-	folder := fs.String("folder", defaultImageFolder, "Dropbox folder for image attachments")
-	mime := fs.String("type", defaultImageMIME, "clipboard image MIME type to paste")
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 2
 	}
 
-	return runImageWithReader(args, stdin, stdout, stderr, wlPasteReader{}, time.Now(), *name, *folder, *mime)
+	return runImageWithReader(args, stdin, stdout, stderr, wlPasteReader{}, time.Now(), opts.name, opts.folder, opts.mime)
 }
 
 // runImageWithReader is the entry point that takes a clipboard reader, used by

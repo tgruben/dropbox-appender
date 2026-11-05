@@ -206,7 +206,7 @@ func TestIntegration_NewFile(t *testing.T) {
 	}
 }
 
-func TestIntegration_FileFlag_NewFileAndJournalLink(t *testing.T) {
+func TestIntegration_FileCommand_NewFileAndJournalLink(t *testing.T) {
 	uploaded := map[string]string{}
 	var journalUpload string
 
@@ -241,14 +241,14 @@ func TestIntegration_FileFlag_NewFileAndJournalLink(t *testing.T) {
 		t.Errorf("target file = %q, want %q", uploaded["/Notes/Projects/alpha.md"], wantTarget)
 	}
 
-	wantJournal := "### 14:30:45\n[alpha](https://www.dropbox.com%2FNotes%2FProjects%2Falpha.md?dl=0)\n"
+	wantJournal := "### 14:30:45\n[[Projects/alpha]]\n"
 	journalUpload = uploaded[resolvePath(now)]
 	if journalUpload != wantJournal {
 		t.Errorf("journal = %q, want %q", journalUpload, wantJournal)
 	}
 }
 
-func TestIntegration_FileFlag_AppendToExistingFile(t *testing.T) {
+func TestIntegration_FileCommand_AppendToExistingFile(t *testing.T) {
 	uploaded := map[string]string{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -288,7 +288,7 @@ func TestIntegration_FileFlag_AppendToExistingFile(t *testing.T) {
 		t.Errorf("target file = %q, want %q", uploaded["/Notes/Projects/alpha.md"], wantTarget)
 	}
 
-	wantJournal := "[alpha](https://www.dropbox.com%2FNotes%2FProjects%2Falpha.md?dl=0)\n"
+	wantJournal := "[[Projects/alpha]]\n"
 	if uploaded[resolvePath(now)] != wantJournal {
 		t.Errorf("journal = %q, want %q", uploaded[resolvePath(now)], wantJournal)
 	}
