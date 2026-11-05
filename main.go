@@ -188,7 +188,7 @@ func printUsage(w io.Writer, root *flag.FlagSet) {
 		"  auth     authorize with Dropbox and save a refresh token\n"+
 		"  sketch   upload an .excalidraw sketch from stdin and link it in today's journal\n"+
 		"  image    upload the clipboard image and link it in today's journal\n"+
-		"  file     append stdin to a Dropbox file and link it in today's journal\n")
+		"  file     append stdin to an Obsidian note and link it in today's journal\n")
 	for _, fs := range []*flag.FlagSet{newAuthFlagSet(), newSketchFlagSet(&sketchOptions{}), newImageFlagSet(&imageOptions{}), newFileFlagSet(&fileOptions{})} {
 		fmt.Fprintln(w)
 		fs.SetOutput(w)

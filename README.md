@@ -62,8 +62,8 @@ cat drawing.excalidraw | dropbox-appender sketch
 # Paste the current clipboard image into /Notes/attachments and link it
 dropbox-appender image
 
-# Append stdin to a specific file and link it from today's journal
-cat notes.md | dropbox-appender file /Notes/Projects/alpha
+# Append stdin to a note and link it from today's journal
+cat notes.md | dropbox-appender file Projects/alpha
 
 # Show every flag for the default mode and all subcommands
 dropbox-appender -h
@@ -72,9 +72,10 @@ dropbox-appender -h
 dropbox-appender -version
 ```
 
-With `file`, the stdin content is appended to that file (created if missing, `.md`
-suffix added if omitted), and today's journal gets a timestamped entry linking to it
-(`file -no-timestamp` omits the `### HH:MM:SS` header from both):
+With `file`, `<path>` is resolved inside the Obsidian vault (Dropbox `/Notes`),
+so `Projects/alpha` targets `/Notes/Projects/alpha.md` (created if missing, `.md`
+suffix added if omitted). Today's journal gets a timestamped Obsidian wiki link to
+it (`file -no-timestamp` omits the `### HH:MM:SS` header from both):
 
 ```markdown
 ### 14:30:45

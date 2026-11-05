@@ -67,8 +67,10 @@ func TestNormalizePath(t *testing.T) {
 		{"/Notes/Projects/alpha", "/Notes/Projects/alpha.md"},
 		{"Notes/Projects/alpha", "/Notes/Projects/alpha.md"},
 		{"/Notes/Projects/alpha.md", "/Notes/Projects/alpha.md"},
-		{"alpha", "/alpha.md"},
+		{"alpha", "/Notes/alpha.md"},
 		{"/Notes/my note.md", "/Notes/my note.md"},
+		{"Research/symbol-matching-sota-raster-vector", "/Notes/Research/symbol-matching-sota-raster-vector.md"},
+		{"/Research/outside-vault", "/Research/outside-vault.md"},
 	}
 	for _, c := range cases {
 		if got := normalizePath(c.in); got != c.want {
@@ -78,10 +80,16 @@ func TestNormalizePath(t *testing.T) {
 }
 
 func TestFileLink(t *testing.T) {
-	got := fileLink("/Notes/Projects/alpha.md")
-	want := "[[Projects/alpha]]"
-	if got != want {
-		t.Errorf("fileLink = %q, want %q", got, want)
+	cases := []struct {
+		in, want string
+	}{
+		{"/Notes/Projects/alpha.md", "[[Projects/alpha]]"},
+		{"/Notes/Research/symbol-matching-sota-raster-vector.md", "[[Research/symbol-matching-sota-raster-vector]]"},
+	}
+	for _, c := range cases {
+		if got := fileLink(c.in); got != c.want {
+			t.Errorf("fileLink(%q) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }
 

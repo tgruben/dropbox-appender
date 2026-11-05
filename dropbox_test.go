@@ -248,6 +248,47 @@ func TestIntegration_FileCommand_NewFileAndJournalLink(t *testing.T) {
 	}
 }
 
+func TestIntegration_FileCommand_VaultRelativePath(t *testing.T) {
+	uploaded := map[string]string{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "download"):
+			w.WriteHeader(409)
+			w.Write([]byte(`{"error_summary": "path/not_found/"}`))
+		case strings.Contains(r.URL.Path, "upload"):
+			body, _ := io.ReadAll(r.Body)
+			var arg struct {
+				Path string `json:"path"`
+			}
+			json.Unmarshal([]byte(r.Header.Get("Dropbox-API-Arg")), &arg)
+			uploaded[arg.Path] = string(body)
+			w.WriteHeader(200)
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer server.Close()
+
+	client := &DropboxClient{Token: "test-token", BaseURL: server.URL}
+	now := time.Date(2025, 1, 15, 14, 30, 45, 0, time.UTC)
+
+	// A vault-relative CLI path must land inside /Notes and link as a wiki link.
+	target := normalizePath("Research/symbol-matching-sota-raster-vector")
+	if err := appendWithLink(client, now, target, formatEntry(now, "note body", false), false); err != nil {
+		t.Fatalf("appendWithLink: %v", err)
+	}
+
+	wantPath := "/Notes/Research/symbol-matching-sota-raster-vector.md"
+	if _, ok := uploaded[wantPath]; !ok {
+		t.Errorf("note not written to %q; uploads: %v", wantPath, uploaded)
+	}
+
+	wantJournal := "### 14:30:45\n[[Research/symbol-matching-sota-raster-vector]]\n"
+	if got := uploaded[resolvePath(now)]; got != wantJournal {
+		t.Errorf("journal = %q, want %q", got, wantJournal)
+	}
+}
+
 func TestIntegration_FileCommand_AppendToExistingFile(t *testing.T) {
 	uploaded := map[string]string{}
 
