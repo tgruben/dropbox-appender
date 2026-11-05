@@ -61,6 +61,17 @@ cat drawing.excalidraw | dropbox-appender sketch
 
 # Paste the current clipboard image into /Notes/attachments and link it
 dropbox-appender image
+
+# Append to a specific file instead of today's journal
+dropbox-appender -file /Notes/Projects/alpha "Long-form note body"
+```
+
+With `-file`, the entry is appended to that file (created if missing, `.md` suffix
+added if omitted), and today's journal gets a timestamped entry linking to it:
+
+```markdown
+### 14:30:45
+[alpha](https://www.dropbox.com%2FNotes%2FProjects%2Falpha.md?dl=0)
 ```
 
 ## Authentication Priority

@@ -205,3 +205,91 @@ func TestIntegration_NewFile(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, uploadedContent)
 	}
 }
+
+func TestIntegration_FileFlag_NewFileAndJournalLink(t *testing.T) {
+	uploaded := map[string]string{}
+	var journalUpload string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "download"):
+			w.WriteHeader(409)
+			w.Write([]byte(`{"error_summary": "path/not_found/"}`))
+		case strings.Contains(r.URL.Path, "upload"):
+			body, _ := io.ReadAll(r.Body)
+			var arg struct {
+				Path string `json:"path"`
+			}
+			json.Unmarshal([]byte(r.Header.Get("Dropbox-API-Arg")), &arg)
+			uploaded[arg.Path] = string(body)
+			w.WriteHeader(200)
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer server.Close()
+
+	client := &DropboxClient{Token: "test-token", BaseURL: server.URL}
+	now := time.Date(2025, 1, 15, 14, 30, 45, 0, time.UTC)
+
+	err := appendWithLink(client, now, "/Notes/Projects/alpha.md", formatEntry(now, "long-form note body", false), false)
+	if err != nil {
+		t.Fatalf("appendWithLink: %v", err)
+	}
+
+	wantTarget := "### 14:30:45\nlong-form note body\n"
+	if uploaded["/Notes/Projects/alpha.md"] != wantTarget {
+		t.Errorf("target file = %q, want %q", uploaded["/Notes/Projects/alpha.md"], wantTarget)
+	}
+
+	wantJournal := "### 14:30:45\n[alpha](https://www.dropbox.com%2FNotes%2FProjects%2Falpha.md?dl=0)\n"
+	journalUpload = uploaded[resolvePath(now)]
+	if journalUpload != wantJournal {
+		t.Errorf("journal = %q, want %q", journalUpload, wantJournal)
+	}
+}
+
+func TestIntegration_FileFlag_AppendToExistingFile(t *testing.T) {
+	uploaded := map[string]string{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var arg struct {
+			Path string `json:"path"`
+		}
+		json.Unmarshal([]byte(r.Header.Get("Dropbox-API-Arg")), &arg)
+
+		switch {
+		case strings.Contains(r.URL.Path, "download"):
+			if arg.Path == "/Notes/Projects/alpha.md" {
+				w.WriteHeader(200)
+				w.Write([]byte("### 09:00:00\nearlier section\n"))
+			} else {
+				w.WriteHeader(409)
+				w.Write([]byte(`{"error_summary": "path/not_found/"}`))
+			}
+		case strings.Contains(r.URL.Path, "upload"):
+			body, _ := io.ReadAll(r.Body)
+			uploaded[arg.Path] = string(body)
+			w.WriteHeader(200)
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer server.Close()
+
+	client := &DropboxClient{Token: "test-token", BaseURL: server.URL}
+	now := time.Date(2025, 1, 15, 14, 30, 45, 0, time.UTC)
+
+	err := appendWithLink(client, now, "/Notes/Projects/alpha.md", formatEntry(now, "new section", true), true)
+	if err != nil {
+		t.Fatalf("appendWithLink: %v", err)
+	}
+
+	wantTarget := "### 09:00:00\nearlier section\n\nnew section\n"
+	if uploaded["/Notes/Projects/alpha.md"] != wantTarget {
+		t.Errorf("target file = %q, want %q", uploaded["/Notes/Projects/alpha.md"], wantTarget)
+	}
+
+	wantJournal := "[alpha](https://www.dropbox.com%2FNotes%2FProjects%2Falpha.md?dl=0)\n"
+	if uploaded[resolvePath(now)] != wantJournal {
+		t.Errorf("journal = %q, want %q", uploaded[resolvePath(now)], wantJournal)
+	}
+}

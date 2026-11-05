@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 )
@@ -54,6 +56,35 @@ func appendContent(existing string, entry string) string {
 		return entry
 	}
 	return existing + "\n" + entry
+}
+
+// normalizePath ensures the Dropbox path is absolute and ends in .md.
+func normalizePath(path string) string {
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	if !strings.HasSuffix(path, ".md") {
+		path += ".md"
+	}
+	return path
+}
+
+// fileLink returns a markdown link to a Dropbox file path.
+func fileLink(p string) string {
+	return fmt.Sprintf("[%s](https://www.dropbox.com%s?dl=0)",
+		strings.TrimSuffix(path.Base(p), ".md"),
+		url.PathEscape(p))
+}
+
+// appendWithLink appends entry to file at path (creating it), then appends
+// a timestamped link entry to today's journal pointing at that file.
+func appendWithLink(client *DropboxClient, now time.Time, path string, entry string, noTimestamp bool) error {
+	if err := appendToJournal(client, path, entry); err != nil {
+		return err
+	}
+
+	linkEntry := formatEntry(now, fileLink(path), noTimestamp)
+	return appendToJournal(client, resolvePath(now), linkEntry)
 }
 
 // resolveToken gets an access token using the priority chain:
@@ -147,6 +178,7 @@ func main() {
 	}
 
 	noTimestamp := flag.Bool("no-timestamp", false, "omit the ### HH:MM:SS header")
+	filePath := flag.String("file", "", "append to the Dropbox file at this path (created if missing) and link to it from today's journal entry")
 	flag.Parse()
 
 	configPath := defaultConfigPath()
@@ -169,10 +201,19 @@ func main() {
 	}
 
 	now := time.Now()
+	client := &DropboxClient{Token: token}
+	if *filePath != "" {
+		target := normalizePath(*filePath)
+		if err := appendWithLink(client, now, target, formatEntry(now, input, *noTimestamp), *noTimestamp); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Appended to %s\n", target)
+		return
+	}
+
 	path := resolvePath(now)
 	entry := formatEntry(now, input, *noTimestamp)
-
-	client := &DropboxClient{Token: token}
 	if err := appendToJournal(client, path, entry); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
